@@ -7,6 +7,8 @@ pub type Body = LinkedList<Segment>;
 #[derive(Debug, PartialEq)]
 pub struct Snake {
     pub body: Body,
+	
+	segments_to_grow_by : u32,
 }
 
 impl Snake {
@@ -15,14 +17,24 @@ impl Snake {
         snake_segments.extend(segments);
         Snake {
             body: snake_segments,
+            segments_to_grow_by : 0,
         }
     }
 
     pub fn move_body(&mut self, direction: &Direction) {
         assert!(!self.body.is_empty());
         self.move_body_internal(direction);
-        self.body.pop_back().unwrap();
+		
+	    if self.segments_to_grow_by > 0 {
+            self.segments_to_grow_by -= 1;
+	    } else {
+            self.body.pop_back().unwrap();
+	    }
     }
+	
+	pub fn grow(&mut self, grow_by : u32) {
+	    self.segments_to_grow_by += grow_by;
+	}
 
     pub fn push_back_segment(&mut self, new_segment: Segment) {
         if self.is_segment_in_body(&new_segment) {

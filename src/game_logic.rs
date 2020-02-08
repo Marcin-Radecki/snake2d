@@ -123,23 +123,7 @@ impl GameLogic {
     fn snake_eat(&mut self) {
         let snake_head = self.snake.body.front().unwrap();
         self.board.clear_obstacle(snake_head.x as usize, snake_head.y as usize);
-        let &last_snake_segment = self.snake.body.back().unwrap();
-        for direction in [Direction::Up, Direction::Right, Direction::Down, Direction::Left].iter() {
-            let new_segment = direction.nearest_segment(&last_snake_segment);
-            if self.board.segment_in(&new_segment) &&
-                self.board.get_field(new_segment.x as usize, new_segment.y as usize) == Obstacle::None {
-                if self.snake.body.len() > 1 {
-                    let &before_last_segment = self.snake.body.iter().nth(self.snake.body.len() - 2).unwrap();
-                    if before_last_segment != new_segment {
-                        self.snake.push_back_segment(new_segment);
-                        return;
-                    }
-                } else {
-                    self.snake.push_back_segment(new_segment);
-                    return;
-                }
-            }
-        }
+        self.snake.grow(1);
     }
 
     pub fn main_loop(&mut self, snake_move: Option<Direction>) {
