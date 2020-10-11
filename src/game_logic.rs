@@ -60,7 +60,7 @@ impl GameLogic {
     }
 
     pub fn get_points(&self) -> usize {
-        self.snake.body.len()
+        self.snake.len()
     }
 
     fn generate_obstacles(&mut self, max_obstacles_count : usize) {
@@ -191,7 +191,6 @@ impl GameLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter::FromIterator;
 
     #[test]
     fn given_initial_game_state_then_no_collisions_are_detected() {
@@ -306,47 +305,46 @@ mod tests {
         let game_logic = GameLogic::new(1, 2, Segment::new(0, 0));
         let obstacles = game_logic.generate_obstacles_positions(1);
         assert_eq!(obstacles.len(), 1);
-        assert!(obstacles.iter().next().unwrap() != &(0usize, 0usize));
+        assert_ne!(obstacles.iter().next().unwrap(), &(0usize, 0usize));
     }
 
     //  A
     // A@A
     #[test]
-    fn given_1_segment_snake_when_obstacles_are_around_snake_end_then_snake_eat_appends_correct_segment() {
+    fn given_1_segment_snake_when_obstacles_are_at_snake_end_then_snake_eat_does_not_append_segment() {
         let mut game_logic = GameLogic::new(7, 13, Segment::new(5, 6));
         game_logic.board.set_obstacle(4,  6);
         game_logic.board.set_obstacle(5,  5);
+        game_logic.board.set_obstacle(5,  6);
         game_logic.board.set_obstacle(6,  6);
+        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
         game_logic.snake_eat();
-        assert_eq!(game_logic.snake.body.len(), 2);
+        assert_eq!(game_logic.check_collisions(), Collision::None);
+        assert_eq!(game_logic.snake.len(), 2);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(5, 6));
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(5, 7));
+        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(5, 6));
     }
 
-    // A@
-    #[test]
-    fn given_1_segment_snake_when_obstacles_are_around_snake_end_then_snake_eat_appends_correct_segment_2() {
-        let mut game_logic = GameLogic::new(7, 13, Segment::new(5, 6));
-        game_logic.board.set_obstacle(4,  6);
-        game_logic.snake_eat();
-        assert_eq!(game_logic.snake.body.len(), 2);
-        assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(5, 6));
-    }
+    fn test_snake_move_expected_collision(game_logic: &mut GameLogic, direction: &Direction) {
+        let current_snake_len = game_logic.snake.len();
+        let current_snake_front = game_logic.snake.body.front().unwrap();
+        let current_snake_back = game_logic.snake.body.back().unwrap();
+        let next_front_segment = direction.nearest_segment(current_snake_front);
+        let next_back_segment: Segment;
+        if game_logic.snake.will_grow() {
+            next_back_segment = current_snake_back.clone();
+        } else {
+            next_back_segment = direction.nearest_segment(current_snake_back);
+        }
 
-    //  A
-    // A@A
-    //  @
-    #[test]
-    fn given_1_segment_snake_when_obstacles_are_full_around_snake_end_then_snake_eat_does_not_append_segment() {
-        let mut game_logic = GameLogic::new(7, 13, Segment::new(5, 6));
-        game_logic.board.set_obstacle(4,  6);
-        game_logic.board.set_obstacle(5,  5);
-        game_logic.board.set_obstacle(6,  6);
-        game_logic.board.set_obstacle(5,  7);
-
+        game_logic.snake.move_body(&direction);
+        assert_eq!(game_logic.snake.len(), current_snake_len);
+        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
+        assert_eq!(game_logic.snake.body.front().unwrap(), &next_front_segment);
+        assert_eq!(game_logic.snake.body.back().unwrap(), &next_back_segment);
         game_logic.snake_eat();
-        assert_eq!(game_logic.snake.body.len(), 1);
-        assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(5, 6));
+        assert_eq!(game_logic.snake.len(), current_snake_len + 1);
+        assert_eq!(game_logic.check_collisions(), Collision::None);
     }
 
     //  AA      AA      AA
@@ -362,20 +360,8 @@ mod tests {
         game_logic.board.set_obstacle(7,  6);
         game_logic.board.set_obstacle(6,  7);
 
-        game_logic.snake.move_body(&Direction::Right);
-        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
-        game_logic.snake_eat();
-        assert_eq!(game_logic.snake.body.len(), 2);
-        assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(6, 6));
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(5, 6));
-
-        assert_eq!(game_logic.check_collisions(), Collision::None);
-        game_logic.snake.move_body(&Direction::Right);
-        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
-        game_logic.snake_eat();
-        assert_eq!(game_logic.snake.body.len(), 3);
-        assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(7, 6));
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(5, 6));
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
     }
 
     #[test]
@@ -404,7 +390,7 @@ mod tests {
 
         for i in 1..6 {
             game_logic.main_loop(Some(Direction::Right));
-            assert_eq!(game_logic.snake.body.len(), i + 1);
+            assert_eq!(game_logic.snake.len(), i + 1);
         }
         game_logic.main_loop(Some(Direction::Down));
         assert_eq!(game_logic.check_collisions(), Collision::None);
@@ -422,15 +408,12 @@ mod tests {
         game_logic.board.set_obstacle(6,  6);
 
         game_logic.main_loop(Some(Direction::Right));
-        assert_eq!(game_logic.snake.body.len(), 2);
+        assert_eq!(game_logic.snake.len(), 2);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(6, 6));
-        // TODO this is not what appended snake segment is expected - it should be (5, 6)
-        // this is because snake::eat() checks if it can append a segment in up direction first
-        // where as it should append by default in the reverse direction of snake move
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6,5 ));
-
-        // TODO this test fails until above issue will be fixed
-        // game_logic.main_loop(Some(Direction::Up));
+        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6,6 ));
+        game_logic.main_loop(Some(Direction::Left));
+        assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(7, 6));
+        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6,6 ));
     }
 
     #[test]
@@ -440,25 +423,22 @@ mod tests {
         game_logic.board.set_obstacle(7,  6);
 
         game_logic.main_loop(Some(Direction::Right));
-        assert_eq!(game_logic.snake.body.len(), 2);
+        assert_eq!(game_logic.snake.len(), 2);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(6, 6));
-        // TODO this is not what appended snake segment is expected - it should be (5, 6)
-        // this is because snake::eat() checks if it can append a segment in up direction first
-        // where as it should append by default in the reverse direction of snake move
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6,5 ));
+        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6,6 ));
 
         game_logic.main_loop(Some(Direction::Right));
-        assert_eq!(game_logic.snake.body.len(), 3);
+        assert_eq!(game_logic.snake.len(), 3);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(7, 6));
-        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6, 5));
+        assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6, 6));
 
         game_logic.main_loop(Some(Direction::Right));
-        assert_eq!(game_logic.snake.body.len(), 3);
+        assert_eq!(game_logic.snake.len(), 3);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(8, 6));
         assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(6, 6));
 
         game_logic.main_loop(Some(Direction::Left));
-        assert_eq!(game_logic.snake.body.len(), 3);
+        assert_eq!(game_logic.snake.len(), 3);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(9, 6));
         assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(7, 6));
 
