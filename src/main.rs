@@ -23,13 +23,13 @@ fn dump_event_settings(events_settings: &EventSettings) {
 fn main() {
     let opengl = OpenGL::V3_2;
     let settings =
-        WindowSettings::new("snake", [640, 640]).
+        WindowSettings::new("snake", [480, 480]).
             graphics_api(opengl).
             exit_on_esc(true);
     let mut window: Window = settings.build().expect("Could not create window");
 
     let mut event_settings = EventSettings::new();
-    const FPS:u64= 20;
+    const FPS:u64= 18;
     event_settings.ups = FPS;
     event_settings.max_fps = FPS;
     dump_event_settings(&event_settings);
@@ -37,8 +37,8 @@ fn main() {
 
     let mut gl = GlGraphics::new(opengl);
 
-    const WIDTH: usize = 40;
-    const HEIGHT: usize = 40;
+    const WIDTH: usize = 25;
+    const HEIGHT: usize = 25;
     const STARTING_SEGMENT : Segment = Segment::new(5, 6);
     let game_logic = game_logic::GameLogic::new(WIDTH, HEIGHT, STARTING_SEGMENT);
     let mut game_controller = game_controller::GameController::new(game_logic);

@@ -64,7 +64,9 @@ impl GameLogic {
     }
 
     fn generate_obstacles(&mut self, max_obstacles_count : usize) {
-        self.set_obstacles(&self.generate_obstacles_positions(max_obstacles_count));
+        let mut rng = rand::thread_rng();
+        let obstacles_count = rng.gen_range(1, max_obstacles_count + 1);
+        self.set_obstacles(&self.generate_obstacles_positions(obstacles_count));
     }
 
     fn set_obstacles(&mut self, obstacles: &HashSet<(usize, usize)>) {
@@ -182,8 +184,9 @@ impl GameLogic {
         }
 
         self.main_loop_counter += 1;
-        if self.main_loop_counter % 100 == 1 {
-            self.generate_obstacles(10);
+        if (self.main_loop_counter == 1 || self.snake.will_grow()) &&
+            self.board.get_number_of_obstacles() < 7 {
+            self.generate_obstacles(3);
         }
     }
 }

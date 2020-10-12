@@ -7,8 +7,6 @@ use crate::game_controller;
 
 /// Stores game view settings.
 pub struct GameViewSettings {
-    /// Size of snake board along horizontal and vertical edge
-    pub size: f64,
     /// Background color
     pub background_color: Color,
     /// Border color
@@ -25,11 +23,10 @@ impl GameViewSettings {
     /// Creates new game view settings.
     pub fn new() -> GameViewSettings {
         GameViewSettings {
-            size: 640.0,
-            background_color: [0.0, 1.0, 0.0, 1.0],
+            background_color: [1.0, 1.0, 1.0, 1.0],
             border_color: [1.0, 1.0, 1.0, 1.0],
             snake_body_color: [1.0, 0.0, 0.0, 1.0],
-            snake_head_color: [0.8, 0.5, 0.0, 1.0],
+            snake_head_color: [0.8, 1.0, 0.0, 1.0],
             obstacle_color: [0.0, 0.0, 1.0, 1.0],
         }
     }
@@ -54,10 +51,17 @@ impl GameView {
         let board_size = controller.game_logic.get_board_size();
         let (segment_size, segment_height) = (screen_size[0] / board_size.0 as f64, screen_size[1] / board_size.1 as f64);
         graphics::clear(self.settings.background_color, g);
+        let &snake_head_segment = controller.game_logic.get_snake_segments().front().unwrap();
+
         for &segment in controller.game_logic.get_snake_segments().iter() {
+            let color = if segment == snake_head_segment {
+                self.settings.snake_head_color
+            } else {
+                self.settings.snake_body_color
+            };
             let square = graphics::rectangle::square(segment.x as f64 * segment_size,
                                            segment.y as f64 * segment_height, segment_size);
-            graphics::rectangle(self.settings.snake_body_color, square, c.transform, g);
+            graphics::rectangle(color, square, c.transform, g);
         }
 
         for obstacle in controller.game_logic.get_obstacles() {
