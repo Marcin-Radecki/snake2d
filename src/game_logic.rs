@@ -47,12 +47,13 @@ impl GameLogic {
         self.snake.body.clone()
     }
 
-    pub fn get_obstacles(&self) -> Vec<(usize, usize)> {
+    pub fn get_obstacles(&self) -> Vec<(usize, usize, u8)> {
         let mut obstacles = Vec::new();
         for i in 0..self.board.width() {
             for j in 0..self.board.height() {
-                if self.board.get_field(i, j) == Obstacle::Apple {
-                    obstacles.push((i, j));
+                match self.board.get_field(i, j) {
+                    Obstacle::Apple(points) => obstacles.push((i, j, points)),
+                    _ => (),
                 }
             }
         }
@@ -63,15 +64,21 @@ impl GameLogic {
         self.snake.len()
     }
 
-    fn generate_obstacles(&mut self, max_obstacles_count : usize) {
+    fn generate_obstacles(&mut self, max_obstacles_count : usize, max_points: u8) {
         let mut rng = rand::thread_rng();
         let obstacles_count = rng.gen_range(1, max_obstacles_count + 1);
-        self.set_obstacles(&self.generate_obstacles_positions(obstacles_count));
+        let points = rng.gen::<u8>() % max_points + 1;
+        let obstacles_positions = self.generate_obstacles_positions(obstacles_count);
+        let mut obstacles = HashSet::new();
+        for obstacle_position in obstacles_positions {
+            obstacles.insert((obstacle_position.0, obstacle_position.1, points));
+        }
+        self.set_obstacles(&obstacles);
     }
 
-    fn set_obstacles(&mut self, obstacles: &HashSet<(usize, usize)>) {
+    fn set_obstacles(&mut self, obstacles: &HashSet<(usize, usize, u8)>) {
         for obstacle in obstacles {
-            self.board.set_obstacle(obstacle.0, obstacle.1);
+            self.board.set_obstacle(obstacle.0, obstacle.1, obstacle.2);
         }
     }
 
@@ -81,7 +88,7 @@ impl GameLogic {
         let board_capacity = self.board.height() * self.board.width();
         let obstacles_count = self.board.get_number_of_obstacles();
         let snake_segments_count = self.snake.body.len() as usize;
-        let mut generated_obstacles = HashSet::new();
+        let mut generated_obstacles_positions = HashSet::new();
         for i in 0..max_obstacles_count {
             if i + 1 + obstacles_count + snake_segments_count > board_capacity {
                 break;
@@ -89,15 +96,15 @@ impl GameLogic {
             loop {
                 let random_index = rng.gen::<usize>() % board_capacity;
                 let segment_guess = self.convert_index_to_coords(random_index);
-                if !generated_obstacles.contains(&segment_guess) &&
+                if !generated_obstacles_positions.contains(&(segment_guess.0, segment_guess.1)) &&
                     self.board.get_field(segment_guess.0, segment_guess.1) == Obstacle::None &&
                     (!self.snake.body.contains(&Segment::new(segment_guess.0 as i32, segment_guess.1 as i32))) {
-                    generated_obstacles.insert(segment_guess);
+                    generated_obstacles_positions.insert((segment_guess.0, segment_guess.1));
                     break;
                 }
             }
         }
-        generated_obstacles
+        generated_obstacles_positions
     }
 
     fn check_collisions(&self) -> Collision {
@@ -124,8 +131,12 @@ impl GameLogic {
 
     fn snake_eat(&mut self) {
         let snake_head = self.snake.body.front().unwrap();
+        let points = match self.board.get_field(snake_head.x as usize, snake_head.y as usize) {
+            Obstacle::Apple(points) => points,
+            _ => panic!("Expected an obstacle to be eaten, got None!"),
+        };
         self.board.clear_obstacle(snake_head.x as usize, snake_head.y as usize);
-        self.snake.grow(1);
+        self.snake.grow(points as usize);
     }
 
     pub fn main_loop(&mut self, snake_move: Option<Direction>) {
@@ -185,8 +196,8 @@ impl GameLogic {
 
         self.main_loop_counter += 1;
         if (self.main_loop_counter == 1 || self.snake.will_grow()) &&
-            self.board.get_number_of_obstacles() < 7 {
-            self.generate_obstacles(3);
+            self.board.get_number_of_obstacles() < 5 {
+            self.generate_obstacles(2, 3);
         }
     }
 }
@@ -258,15 +269,15 @@ mod tests {
         for obstacle in obstacles {
             match game_logic.snake.body.iter().find(| &&segment|
                 (segment.x as usize, segment.y as usize) == obstacle) {
-                Some(erroneus_segment) => panic!("Snake segment ({}, {}) has \
-                    the same position as generated obstacle!", erroneus_segment.x, erroneus_segment.y),
+                Some(erroneous_segment) => panic!("Snake segment ({}, {}) has \
+                    the same position as generated obstacle!", erroneous_segment.x, erroneous_segment.y),
                 None => ()
             }            assert_eq!(game_logic.board.segment_in(&Segment::new(obstacle.0 as i32, obstacle.1 as i32)), true);
         }
     }
 
     #[test]
-    fn given_empty_board_when_generating_obstacles_then_obstacles_are_generated() {
+    fn given_empty_board_when_generating_obstacles_then_logic_does_not_panic() {
         let (width, height) = (7usize, 11usize);
         for i in 1..(width*height+1) {
             generate_n_obstacles(i, width, height);
@@ -275,7 +286,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn given_mpty_board_when_0_obstacles_are_generated_then_panic() {
+    fn given_mpty_board_when_0_obstacles_are_generated_then_logic_panics() {
         let game_logic = GameLogic::new(1, 1, Segment::new(0, 0));
         let _obstacles = game_logic.generate_obstacles_positions(0);
     }
@@ -316,11 +327,11 @@ mod tests {
     #[test]
     fn given_1_segment_snake_when_obstacles_are_at_snake_end_then_snake_eat_does_not_append_segment() {
         let mut game_logic = GameLogic::new(7, 13, Segment::new(5, 6));
-        game_logic.board.set_obstacle(4,  6);
-        game_logic.board.set_obstacle(5,  5);
-        game_logic.board.set_obstacle(5,  6);
-        game_logic.board.set_obstacle(6,  6);
-        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
+        game_logic.board.set_obstacle(4, 6, 1);
+        game_logic.board.set_obstacle(5, 5, 1);
+        game_logic.board.set_obstacle(5, 6, 1);
+        game_logic.board.set_obstacle(6,  6, 1);
+        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple(1)));
         game_logic.snake_eat();
         assert_eq!(game_logic.check_collisions(), Collision::None);
         assert_eq!(game_logic.snake.len(), 2);
@@ -342,11 +353,14 @@ mod tests {
 
         game_logic.snake.move_body(&direction);
         assert_eq!(game_logic.snake.len(), current_snake_len);
-        assert_eq!(game_logic.check_collisions(), Collision::Obstacle(Obstacle::Apple));
+        let points = match game_logic.check_collisions() {
+            Collision::Obstacle(Obstacle::Apple(points)) => points,
+            _ => panic!("Expected collision with apple, got none!"),
+        };
         assert_eq!(game_logic.snake.body.front().unwrap(), &next_front_segment);
         assert_eq!(game_logic.snake.body.back().unwrap(), &next_back_segment);
         game_logic.snake_eat();
-        assert_eq!(game_logic.snake.len(), current_snake_len + 1);
+        assert_eq!(game_logic.snake.len(), current_snake_len + points as usize);
         assert_eq!(game_logic.check_collisions(), Collision::None);
     }
 
@@ -356,12 +370,12 @@ mod tests {
     #[test]
     fn given_1_segment_snake_when_eat_twice_snake_has_3_segments() {
         let mut game_logic = GameLogic::new(8, 13, Segment::new(5, 6));
-        game_logic.board.set_obstacle(4,  6);
-        game_logic.board.set_obstacle(5,  5);
-        game_logic.board.set_obstacle(6,  5);
-        game_logic.board.set_obstacle(6,  6);
-        game_logic.board.set_obstacle(7,  6);
-        game_logic.board.set_obstacle(6,  7);
+        game_logic.board.set_obstacle(4,  6, 1);
+        game_logic.board.set_obstacle(5,  5, 1);
+        game_logic.board.set_obstacle(6,  5, 1);
+        game_logic.board.set_obstacle(6,  6, 1);
+        game_logic.board.set_obstacle(7,  6, 1);
+        game_logic.board.set_obstacle(6,  7, 1);
 
         test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
         test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
@@ -370,8 +384,8 @@ mod tests {
     #[test]
     fn given_empty_board_when_set_obstacles_is_called_then_obstacles_have_correct_positions() {
         let mut game_logic = GameLogic::new(8, 13, Segment::new(5, 6));
-        let mut obstacles=  vec![(0usize, 0usize), (1usize, 1usize), (7usize, 12usize),
-            (7usize, 0usize), (0usize, 12usize), (4usize, 10usize)];
+        let mut obstacles=  vec![(0usize, 0usize, 1u8), (1usize, 1usize, 1u8), (7usize, 12usize, 1u8),
+            (7usize, 0usize, 1u8), (0usize, 12usize, 2u8), (4usize, 10usize, 3u8)];
         let mut obstacles_set= HashSet::new();
         for &obstacle in obstacles.iter() {
             obstacles_set.insert(obstacle);
@@ -388,7 +402,7 @@ mod tests {
     fn given_more_than_1_segment_snake_when_snake_moves_and_crosses_itself_then_snake_collision_is_detected() {
         let mut game_logic = GameLogic::new(8, 13, Segment::new(0, 0));
         for i in 1..6 {
-            game_logic.board.set_obstacle(i,  0);
+            game_logic.board.set_obstacle(i,  0, 1);
         }
 
         for i in 1..6 {
@@ -408,7 +422,7 @@ mod tests {
     #[test]
     fn given_more_2_segment_snake_when_snake_moves_backward_then_nothing_happens() {
         let mut game_logic = GameLogic::new(8, 13, Segment::new(5, 6));
-        game_logic.board.set_obstacle(6,  6);
+        game_logic.board.set_obstacle(6,  6, 1);
 
         game_logic.main_loop(Some(Direction::Right));
         assert_eq!(game_logic.snake.len(), 2);
@@ -422,8 +436,8 @@ mod tests {
     #[test]
     fn given_more_than_2_segment_snake_when_snake_moves_backward_then_nothing_happens() {
         let mut game_logic = GameLogic::new(100, 103, Segment::new(5, 6));
-        game_logic.board.set_obstacle(6,  6);
-        game_logic.board.set_obstacle(7,  6);
+        game_logic.board.set_obstacle(6,  6, 1);
+        game_logic.board.set_obstacle(7,  6, 1);
 
         game_logic.main_loop(Some(Direction::Right));
         assert_eq!(game_logic.snake.len(), 2);
@@ -444,6 +458,46 @@ mod tests {
         assert_eq!(game_logic.snake.len(), 3);
         assert_eq!(game_logic.snake.body.front().unwrap(), &Segment::new(9, 6));
         assert_eq!(game_logic.snake.body.back().unwrap(), &Segment::new(7, 6));
-
     }
+
+    //  AA      @A      #@      ##      ##
+    // A@AA => A#AA => A#AA => A#@A => A##@
+    //   A       A       A       A       A
+    #[test]
+    fn given_one_segment_snake_when_snake_collects_1_point_apples_then_game_points_are_correct() {
+        let mut game_logic = GameLogic::new(8, 13, Segment::new(5, 6));
+        game_logic.board.set_obstacle(4,  6, 1);
+        game_logic.board.set_obstacle(5,  5, 1);
+        game_logic.board.set_obstacle(6,  5, 1);
+        game_logic.board.set_obstacle(6,  6, 1);
+        game_logic.board.set_obstacle(7,  6, 1);
+        game_logic.board.set_obstacle(6,  7, 1);
+
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Up);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Down);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
+
+        assert_eq!(game_logic.snake.len(), 5);
+    }
+
+    #[test]
+    fn given_one_segment_snake_when_snake_collects_123_point_apples_then_game_points_are_correct() {
+        let mut game_logic = GameLogic::new(8, 13, Segment::new(5, 6));
+        game_logic.board.set_obstacle(4,  6, 1);
+        game_logic.board.set_obstacle(5,  5, 1);
+        game_logic.board.set_obstacle(6,  5, 2);
+        game_logic.board.set_obstacle(6,  6, 3);
+        game_logic.board.set_obstacle(7,  6, 1);
+        game_logic.board.set_obstacle(6,  7, 1);
+
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Up);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Down);
+        test_snake_move_expected_collision(&mut game_logic, &Direction::Right);
+
+        assert_eq!(game_logic.snake.len(), 8);
+    }
+
+
 }

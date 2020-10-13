@@ -16,7 +16,7 @@ pub struct GameViewSettings {
     /// Snake head color
     pub snake_head_color : Color,
     /// Obstacle color
-    pub obstacle_color : Color,
+    pub obstacles_color: [Color; 3],
 }
 
 impl GameViewSettings {
@@ -27,7 +27,11 @@ impl GameViewSettings {
             border_color: [1.0, 1.0, 1.0, 1.0],
             snake_body_color: [1.0, 0.0, 0.0, 1.0],
             snake_head_color: [0.8, 1.0, 0.0, 1.0],
-            obstacle_color: [0.0, 0.0, 1.0, 1.0],
+            obstacles_color: [
+                [0.6, 0.4, 0.2, 1.0],
+                [0.75, 0.75, 0.75, 1.0],
+                [0.9, 0.9, 0.0, 1.0],
+                ],
         }
     }
 }
@@ -67,7 +71,9 @@ impl GameView {
         for obstacle in controller.game_logic.get_obstacles() {
             let square = graphics::rectangle::square(obstacle.0 as f64 * segment_size,
                                            obstacle.1 as f64 * segment_height, segment_size);
-            graphics::rectangle(self.settings.obstacle_color, square, c.transform, g);
+            let points = obstacle.2 as u8 - 1;
+            let obstacle_color = self.settings.obstacles_color[points as usize];
+            graphics::rectangle(obstacle_color, square, c.transform, g);
         }
     }
 }

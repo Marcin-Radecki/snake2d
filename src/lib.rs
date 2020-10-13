@@ -31,5 +31,5 @@ impl Direction {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Obstacle {
     None,
-    Apple,
+    Apple(u8),
 }

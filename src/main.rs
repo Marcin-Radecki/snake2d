@@ -29,7 +29,7 @@ fn main() {
     let mut window: Window = settings.build().expect("Could not create window");
 
     let mut event_settings = EventSettings::new();
-    const FPS:u64= 18;
+    const FPS:u64= 15;
     event_settings.ups = FPS;
     event_settings.max_fps = FPS;
     dump_event_settings(&event_settings);

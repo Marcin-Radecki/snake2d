@@ -36,8 +36,8 @@ impl Board {
         self.board[x][y]
     }
 
-    pub fn set_obstacle(&mut self, x: usize, y: usize) {
-        self.board[x][y] = Obstacle::Apple;
+    pub fn set_obstacle(&mut self, x: usize, y: usize, points: u8) {
+        self.board[x][y] = Obstacle::Apple(points);
         self.number_of_obstacles += 1;
     }
 
@@ -97,13 +97,13 @@ mod tests {
         let mut board = Board::new(20, 45);
         assert_empty_board(&board);
 
-        board.set_obstacle(10, 30);
-        board.set_obstacle(0, 0);
-        board.set_obstacle(19, 44);
+        board.set_obstacle(10, 30, 1);
+        board.set_obstacle(0, 0, 2);
+        board.set_obstacle(19, 44, 3);
 
-        assert_eq!(board.get_field(10, 30), Obstacle::Apple);
-        assert_eq!(board.get_field(0, 0), Obstacle::Apple);
-        assert_eq!(board.get_field(19, 44), Obstacle::Apple);
+        assert_eq!(board.get_field(10, 30), Obstacle::Apple(1));
+        assert_eq!(board.get_field(0, 0), Obstacle::Apple(2));
+        assert_eq!(board.get_field(19, 44), Obstacle::Apple(3));
 
         assert_eq!(board.get_field(18, 44), Obstacle::None);
     }
