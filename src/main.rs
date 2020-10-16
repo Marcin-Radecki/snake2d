@@ -26,7 +26,8 @@ fn main() {
         WindowSettings::new("snake", [480, 480]).
             graphics_api(opengl).
             exit_on_esc(true);
-    let mut window: Window = settings.build().expect("Could not create window");
+    let mut window:Window = settings.build().expect("Could not create window");
+
 
     let mut event_settings = EventSettings::new();
     const FPS:u64= 15;
@@ -43,7 +44,8 @@ fn main() {
     let game_logic = game_logic::GameLogic::new(WIDTH, HEIGHT, STARTING_SEGMENT);
     let mut game_controller = game_controller::GameController::new(game_logic);
     let game_view_settings = game_view::GameViewSettings::new();
-    let game_view = game_view::GameView::new(game_view_settings);
+    let mut game_view = game_view::GameView::new(game_view_settings);
+    game_view.load_textures();
 
     while let Some(e) = events.next(&mut window) {
         game_controller.event(&e);
