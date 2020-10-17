@@ -45,7 +45,7 @@ fn main() {
     let mut game_controller = game_controller::GameController::new(game_logic);
     let game_view_settings = game_view::GameViewSettings::new();
     let mut game_view = game_view::GameView::new(game_view_settings);
-    game_view.load_textures();
+    game_view.load_textures("assets");
 
     while let Some(e) = events.next(&mut window) {
         game_controller.event(&e);

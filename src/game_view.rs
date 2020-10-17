@@ -33,8 +33,8 @@ impl GameViewSettings {
         GameViewSettings {
             background_color: [1.0, 1.0, 1.0, 1.0],
             border_color: [1.0, 1.0, 1.0, 1.0],
-            snake_body_color: [1.0, 0.0, 0.0, 1.0],
-            snake_head_color: [0.8, 1.0, 0.0, 1.0],
+            snake_body_color: [0.0, 0.0, 0.7, 1.0],
+            snake_head_color: [0.9, 0.0, 0.0, 1.0],
             scores_lookup: scores,
         }
     }
@@ -57,20 +57,20 @@ impl GameView {
         }
     }
 
-    pub fn load_textures(&mut self) {
-        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("assets").unwrap();
+    /// loads textures from asset folder
+    pub fn load_textures(&mut self, asset_folder : &str) {
+        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder(asset_folder).unwrap();
         for entry in glob(assets.join("*.png").to_str().unwrap()).expect("Failed to find textures in asset directory!") {
-            match entry {
-                Ok(path) => {
-                    let path_stem = path.file_stem().unwrap().to_str().unwrap();
-                    let path = path.to_str().unwrap();
-                    let texture = self.load_texture_from_path(path);
-                    self.textures.insert(String::from(path_stem), texture);
-                    println!("{}", path);
-
-                }
-                Err(e) => println!("{:?}", e),
+            if let Ok(path) = entry {
+                let path_stem = path.file_stem().unwrap().to_str().unwrap();
+                let path = path.to_str().unwrap();
+                let texture = self.load_texture_from_path(path);
+                self.textures.insert(String::from(path_stem), texture);
             }
+        }
+        println!("Loaded {} texture files.", self.textures.len());
+        if self.textures.is_empty() {
+            println!("WARNING: No textures loaded!");
         }
     }
 
@@ -79,7 +79,11 @@ impl GameView {
         Texture::from_path(path, &texture_settings).unwrap()
     }
 
+    // TODO it's not possible to unit-test below method as in order to create a Texture object
+    // (even empty one) requires a gl context to be created
+    // see https://github.com/PistonDevelopers/opengl_graphics/issues/103
     fn get_scaling_factor(&self, texture: &Texture, desired_size: Scalar) -> Scalar {
+        assert!(desired_size > 0.0);
         assert_eq!(texture.get_height(), texture.get_width());
         1.0 / (texture.get_width() as Scalar / desired_size)
     }
@@ -95,9 +99,7 @@ impl GameView {
         graphics::image(texture, t, g);
     }
 
-
-
-    /// Draw game view.
+    /// Draws all objects on a screen
     pub fn draw<G: Graphics<Texture = Texture>>(&self, controller: &game_controller::GameController, c: &Context, g: &mut G, screen_size: [f64;2]) {
         let board_size = controller.game_logic.get_board_size();
         let (segment_size, segment_height) = (screen_size[0] / board_size.0 as f64, screen_size[1] / board_size.1 as f64);
@@ -118,16 +120,10 @@ impl GameView {
         for obstacle in controller.game_logic.get_obstacles() {
             let obstacle_left_upper_corner_position = [obstacle.0 as f64 * segment_size,
                 obstacle.1 as f64 * segment_height];
-            let square = graphics::rectangle::square(
-                obstacle_left_upper_corner_position[0],
-                obstacle_left_upper_corner_position[1],
-                segment_size);
             let points = obstacle.2;
             let texture_name = self.settings.scores_lookup.get(&points).unwrap();
             let texture = self.textures.get(texture_name).unwrap();
             self.draw_texture_at_position( &c, g, texture, obstacle_left_upper_corner_position, segment_size);
-
         }
-
     }
 }
